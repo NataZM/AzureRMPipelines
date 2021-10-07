@@ -1,0 +1,130 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "webServASGTag": {
+            "type": "object",
+            "defaultValue": {
+                "Resources Type": "WEB Servers",
+                "Project": "Tutorial pipeline"
+            }
+        },
+        "sqlServASGTag": {
+            "type": "object",
+            "defaultValue": {
+                "Resource Type": "SQL Servers",
+                "Project": "Tutorial pipeline"
+            }
+        },
+        "NsgName": {
+            "type": "string",
+            "defaultValue": "skillup-nsg"
+        }
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [
+      {
+          "name": "webservers-asg",
+          "type": "Microsoft.Network/applicationSecurityGroups",
+          "apiVersion": "2019-11-01",
+          "location": "[resourceGroup().location]",
+          "tags": "[parameters('webServASGTag')]",
+          "properties": {}
+      },
+      {
+          "name": "sqlservers-asg",
+          "type": "Microsoft.Network/applicationSecurityGroups",
+          "apiVersion": "2019-11-01",
+          "location": "[resourceGroup().location]",
+          "tags": "[parameters('sqlServASGTag')]",
+          "properties": {}
+      },
+      {
+          "name": "[parameters('NsgName')]",
+          "type": "Microsoft.Network/networkSecurityGroups",
+          "apiVersion": "2019-11-01",
+          "location": "[resourceGroup().location]",
+          "dependsOn": [
+              "[resourceId('Microsoft.Network/applicationSecurityGroups', 'sqlservers-asg')]",
+              "[resourceId('Microsoft.Network/applicationSecurityGroups', 'webservers-asg')]"
+          ],
+          "properties": {
+              "securityRules": [
+                  {
+                      "name": "sqlRule",
+                      "properties": {
+                          "description": "Allow Sql Servers flows",
+                          "protocol": "Tcp",
+                          "sourcePortRange": "*",
+                          "destinationPortRange": "1433",
+                          "sourceApplicationSecurityGroups": [
+                              {
+                                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', 'webservers-asg')]"
+                              }
+                          ],
+                          "destinationApplicationSecurityGroups": [
+                              {
+                                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', 'sqlservers-asg')]"
+                              }
+                          ],
+                          "access": "Allow",
+                          "priority": 100,
+                          "direction": "Inbound"
+                      }
+                  },
+                  {
+                      "name": "allowHttp",
+                      "properties": {
+                          "description": "Allow HTTP flows",
+                          "protocol": "Tcp",
+                          "sourcePortRange": "*",
+                          "destinationPortRanges": ["80", "443"],
+                          "sourceAddressPrefix": "*",
+                          "destinationApplicationSecurityGroups": [
+                              {
+                                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', 'webservers-asg')]"
+                              }
+                          ],
+                          "access": "Allow",
+                          "priority": 101,
+                          "direction": "Inbound"
+                      }
+                  },
+                   {
+                      "name": "allowRDP",
+                      "properties": {
+                          "description": "Allow RDP for Web Servers",
+                          "protocol": "*",
+                          "sourcePortRange": "*",
+                          "destinationPortRange": "3389",
+                          "sourceAddressPrefix": "*",
+                          "destinationApplicationSecurityGroups": [
+                              {
+                                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', 'webservers-asg')]"
+                              }
+                          ],
+                          "access": "Allow",
+                          "priority": 102,
+                          "direction": "Inbound"
+                      }
+                  },
+                  {
+                      "name": "DenyVnetInbound",
+                      "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationAddressPrefix": "VirtualNetwork",
+                            "access": "Deny",
+                            "priority": 1500,
+                            "direction": "Inbound"
+                      }
+                  }
+              ]
+          }
+      }
+    ],
+    "outputs": {}
+}
